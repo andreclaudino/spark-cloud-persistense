@@ -1,6 +1,7 @@
 name := "spark-cloud-persistense"
 organization in ThisBuild := "com.b2w.iafront.persistense"
 scalaVersion in ThisBuild := "2.11.12"
+version := "1.0.0"
 
 val sparkVersion = "2.4.3"
 
