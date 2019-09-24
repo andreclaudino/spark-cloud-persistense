@@ -1,6 +1,5 @@
 package com.b2wdigital.iafront.persistense.validation
 
-import org.apache.spark.sql.SparkSession._
 import com.b2wdigital.iafront.persistense.s3._
 import com.b2wdigital.iafront.session.SessionUtils
 import org.apache.spark.sql.SaveMode
