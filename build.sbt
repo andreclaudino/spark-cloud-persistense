@@ -1,7 +1,6 @@
 name := "spark-cloud-persistense"
 organization in ThisBuild := "com.b2w.iafront.persistense"
 scalaVersion in ThisBuild := "2.11.12"
-version := "1.0.0"
 
 val sparkVersion = "2.4.3"
 
@@ -10,6 +9,8 @@ lazy val root =
       .aggregate(base)
       .aggregate(s3)
       .aggregate(gs)
+      .aggregate(validationS3)
+      .aggregate(validationGS)
 
 lazy val commonConfiguration = Seq(
   {
@@ -17,6 +18,7 @@ lazy val commonConfiguration = Seq(
       case PathList("javax", "servlet", xs @ _*) => MergeStrategy.last
       case PathList("javax", "activation", xs @ _*) => MergeStrategy.last
       case PathList("org", "apache", xs @ _*) => MergeStrategy.last
+      case PathList("org", "lo4j", xs @ _*) => MergeStrategy.last
       case PathList("com", "google", xs @ _*) => MergeStrategy.last
       case PathList("com", "esotericsoftware", xs @ _*) => MergeStrategy.last
       case PathList("com", "codahale", xs @ _*) => MergeStrategy.last
@@ -41,10 +43,26 @@ lazy val commonConfiguration = Seq(
   {
     /// Configurações para execução
     run in Compile := Defaults.runTask(fullClasspath in Compile, mainClass in (Compile, run), runner in (Compile, run)).evaluated
+  },
+  {
     runMain in Compile := Defaults.runMainTask(fullClasspath in Compile, runner in(Compile, run)).evaluated
+  },
+  {
+    version := "1.0.2-SNAPSHOT"
   }
 )
 
+val publishFatjar = Seq(
+  {
+    artifact in (Compile, assembly) := {
+      val art = (artifact in (Compile, assembly)).value
+      art.withClassifier(Some("assembly"))
+    }
+  },
+  {
+    addArtifact(artifact in (Compile, assembly), assembly)
+  }
+)
 /////////////////////// base ////////////////////////////////////////
 lazy val base  =
   Project("spark-cloud-persistense-base", file("base-persistense"))
@@ -64,12 +82,21 @@ lazy val s3  =
     .dependsOn(base)
     .settings(
       libraryDependencies ++= commonDependencies ++ s3Dependencies
-    ).settings(commonConfiguration)
-    .settings(s3ShadeRules)
+    )
+    .settings(artifact in (Compile, assembly) := {
+      val art = (artifact in (Compile, assembly)).value
+      art.withClassifier(Some("assembly"))
+    })
+  .settings(addArtifact(artifact in (Compile, assembly), assembly))
+    .settings(commonConfiguration)
+//    .settings(s3ShadeRules)
 
 lazy val s3Dependencies = Seq(
-  "com.amazonaws" % "aws-java-sdk" % "1.7.4",
+  "com.amazonaws" % "aws-java-sdk" % "1.7.4"
+    exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.apache.hadoop" % "hadoop-aws" % "2.7.3"
+    exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.6.7"
 )
 
 lazy val s3ShadeRules = {
@@ -78,7 +105,11 @@ lazy val s3ShadeRules = {
     .rename("*" -> "com.b2wdigital.iafront.persistense.s3.shaded.@1")
     .inAll,
   ShadeRule
-    .keep("org.apache.spark.**", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+    .keep(
+      "org.apache.**",
+      "org.apache.hadoop.fs.s3a.S3AFileSystem",
+      "org.log4j.**",
+      "com.b2wdigital.iafront.persistense.s3.**")
     .inAll
   )
 }
@@ -89,7 +120,7 @@ lazy val gs  =
     .settings(
       libraryDependencies ++= commonDependencies ++ gsDependencies
     ).settings(commonConfiguration)
-    .settings(gsShadeRules)
+//     .settings(gsShadeRules)
 
 lazy val gsDependencies = Seq(
   "commons-beanutils" % "commons-beanutils" % "1.9.4",
@@ -109,15 +140,25 @@ lazy val gsShadeRules = {
     .rename("*" -> "com.b2wdigital.iafront.persistense.gs.shaded.@1")
     .inAll,
   ShadeRule
-    .keep("org.apache.spark.**", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
+    .keep(
+      "org.apache.**",
+      "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS",
+      "org.log4j.**",
+      "com.b2wdigital.iafront.persistense.gs.**")
     .inAll
   )
 }
 /////////////////// validation //////////////////////////////////////
-lazy val validation  =
-  Project("validation", file("validation"))
-    .dependsOn(gs)
+lazy val validationS3  =
+  Project("validation-s3", file("validation-s3"))
     .dependsOn(s3)
+    .settings(
+      libraryDependencies ++= commonDependencies
+    ).settings(commonConfiguration)
+
+lazy val validationGS  =
+  Project("validation-gs", file("validation-gs"))
+    .dependsOn(gs)
     .settings(
       libraryDependencies ++= commonDependencies
     ).settings(commonConfiguration)
