@@ -5,8 +5,14 @@ import com.b2wdigital.iafront.session.SessionUtils
 import org.apache.spark.sql.SaveMode
 
 object TestS3 extends App {
-    
-    val spark = SessionUtils.createSession(Some("local[1]"))
+
+    val spark =
+        if(args.length > 2){
+            SessionUtils.createSession(Some(args(2)))
+        } else
+        {
+            SessionUtils.createSession(None)
+        }
 
     spark.setupS3
 
