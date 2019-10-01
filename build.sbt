@@ -52,17 +52,6 @@ lazy val commonConfiguration = Seq(
   }
 )
 
-val publishFatjar = Seq(
-  {
-    artifact in (Compile, assembly) := {
-      val art = (artifact in (Compile, assembly)).value
-      art.withClassifier(Some("assembly"))
-    }
-  },
-  {
-    addArtifact(artifact in (Compile, assembly), assembly)
-  }
-)
 /////////////////////// base ////////////////////////////////////////
 lazy val base  =
   Project("spark-cloud-persistense-base", file("base-persistense"))
@@ -88,8 +77,8 @@ lazy val s3  =
       art.withClassifier(Some("assembly"))
     })
   .settings(addArtifact(artifact in (Compile, assembly), assembly))
-    .settings(commonConfiguration)
-//    .settings(s3ShadeRules)
+  .settings(commonConfiguration)
+  .settings(s3ShadeRules)
 
 lazy val s3Dependencies = Seq(
   "com.amazonaws" % "aws-java-sdk" % "1.7.4"
@@ -120,7 +109,6 @@ lazy val gs  =
     .settings(
       libraryDependencies ++= commonDependencies ++ gsDependencies
     ).settings(commonConfiguration)
-//     .settings(gsShadeRules)
 
 lazy val gsDependencies = Seq(
   "commons-beanutils" % "commons-beanutils" % "1.9.4",
@@ -155,6 +143,12 @@ lazy val validationS3  =
     .settings(
       libraryDependencies ++= commonDependencies
     ).settings(commonConfiguration)
+    .settings(artifact in (Compile, assembly) := {
+      val art = (artifact in (Compile, assembly)).value
+      art.withClassifier(Some("assembly"))
+    })
+    .settings(addArtifact(artifact in (Compile, assembly), assembly))
+    .settings(commonConfiguration)
 
 lazy val validationGS  =
   Project("validation-gs", file("validation-gs"))
@@ -162,6 +156,12 @@ lazy val validationGS  =
     .settings(
       libraryDependencies ++= commonDependencies
     ).settings(commonConfiguration)
+    .settings(artifact in (Compile, assembly) := {
+      val art = (artifact in (Compile, assembly)).value
+      art.withClassifier(Some("assembly"))
+    })
+    .settings(addArtifact(artifact in (Compile, assembly), assembly))
+    .settings(commonConfiguration)
 
 
 /////////////// Confiurations //////////////////////
