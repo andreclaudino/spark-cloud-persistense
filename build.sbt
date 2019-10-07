@@ -48,7 +48,7 @@ lazy val commonConfiguration = Seq(
     runMain in Compile := Defaults.runMainTask(fullClasspath in Compile, runner in(Compile, run)).evaluated
   },
   {
-    version := "1.0.2-SNAPSHOT"
+    version := "1.0.3-SNAPSHOT"
   }
 )
 
@@ -78,7 +78,7 @@ lazy val s3  =
     })
   .settings(addArtifact(artifact in (Compile, assembly), assembly))
   .settings(commonConfiguration)
-  .settings(s3ShadeRules)
+//  .settings(s3ShadeRules)
 
 lazy val s3Dependencies = Seq(
   "com.amazonaws" % "aws-java-sdk" % "1.7.4"
