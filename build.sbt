@@ -1,17 +1,36 @@
 name := "spark-cloud-persistense"
-organization in ThisBuild := "com.b2w.iafront.persistense"
+organization in ThisBuild := "com.b2wdigital.iafront.persistense"
 scalaVersion in ThisBuild := "2.11.12"
 
-val sparkVersion = "2.4.3"
+publishTo := sonatypePublishTo.value
+publishConfiguration := publishConfiguration.value.withOverwrite(true)
+publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(true)
+publishMavenStyle := true
+licenses := Seq("APL2" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
+sonatypeProfileName := "com.b2wdigital"
+
+import xerial.sbt.Sonatype._
+sonatypeProjectHosting := Some(GitHubHosting("andreclaudino", "spark-cloud-persistense", ""))
+homepage := Some(url(s"https://github.com/andreclaudino/spark-cloud-persistense"))
+scmInfo := Some(
+  ScmInfo(url("https://github.com/andreclaudino/SparkSinfony"), "scm:git@github.com:andreclaudino/spark-cloud-persistense.git")
+)
+
+val commonVersion = "1.0.3"
+
+version := commonVersion
+
+val awsServicesVersion = "2.10.7"
+
+val sparkVersion = "2.4.4"
 
 lazy val root =
   (project in file("."))
       .aggregate(base)
       .aggregate(s3)
       .aggregate(gs)
-      .aggregate(validationS3)
-      .aggregate(validationGS)
 
+/// Subprojects
 lazy val commonConfiguration = Seq(
   {
     assemblyMergeStrategy in assembly := {
@@ -48,7 +67,7 @@ lazy val commonConfiguration = Seq(
     runMain in Compile := Defaults.runMainTask(fullClasspath in Compile, runner in(Compile, run)).evaluated
   },
   {
-    version := "1.0.3-SNAPSHOT"
+    version := commonVersion
   }
 )
 
@@ -56,8 +75,8 @@ lazy val commonConfiguration = Seq(
 lazy val base  =
   Project("spark-cloud-persistense-base", file("base-persistense"))
     .settings(
-      libraryDependencies ++= commonDependencies
-    ).settings(commonConfiguration)
+      Seq(libraryDependencies ++= commonDependencies) ++ commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-base"))
+    ).settings(commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-base"))
 
 lazy val commonDependencies =
   Seq(
@@ -69,7 +88,7 @@ lazy val commonDependencies =
 lazy val s3  =
   Project("spark-cloud-persistense-s3", file("s3-persistense"))
     .dependsOn(base)
-    .settings(
+    .settings(libraryDependencies ++= commonDependencies ++ s3Dependencies)
       libraryDependencies ++= commonDependencies ++ s3Dependencies
     )
     .settings(artifact in (Compile, assembly) := {
@@ -77,7 +96,7 @@ lazy val s3  =
       art.withClassifier(Some("assembly"))
     })
   .settings(addArtifact(artifact in (Compile, assembly), assembly))
-  .settings(commonConfiguration)
+  .settings(commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-s3"))
 //  .settings(s3ShadeRules)
 
 lazy val s3Dependencies = Seq(
@@ -108,7 +127,8 @@ lazy val gs  =
     .dependsOn(base)
     .settings(
       libraryDependencies ++= commonDependencies ++ gsDependencies
-    ).settings(commonConfiguration)
+    )
+    .settings(commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-gs"))
 
 lazy val gsDependencies = Seq(
   "commons-beanutils" % "commons-beanutils" % "1.9.4",
@@ -148,7 +168,7 @@ lazy val validationS3  =
       art.withClassifier(Some("assembly"))
     })
     .settings(addArtifact(artifact in (Compile, assembly), assembly))
-    .settings(commonConfiguration)
+    .settings(commonConfiguration ++ Seq(publishArtifact := false))
 
 lazy val validationGS  =
   Project("validation-gs", file("validation-gs"))
@@ -161,8 +181,28 @@ lazy val validationGS  =
       art.withClassifier(Some("assembly"))
     })
     .settings(addArtifact(artifact in (Compile, assembly), assembly))
-    .settings(commonConfiguration)
+    .settings(commonConfiguration ++ Seq(publishArtifact := false))
 
 
-/////////////// Confiurations //////////////////////
+/////////////// Configurations //////////////////////
 logLevel in assembly := Level.Debug
+
+
+/////////////// Publishing ///////////////
+
+def publishingConfiguration(name:String):sbt.Def.SettingsDefinition = Seq(
+  publishTo := sonatypePublishToBundle.value,
+  publishConfiguration := publishConfiguration.value.withOverwrite(true),
+  publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(true),
+  publishMavenStyle := true,
+  licenses := Seq("APL2" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt")),
+  sonatypeProfileName := "com.b2wdigital",
+  {
+    import xerial.sbt.Sonatype._
+    sonatypeProjectHosting := Some(GitHubHosting("andreclaudino", name, ""))
+  },
+  homepage := Some(url(s"https://github.com/andreclaudino/spark-cloud-persistense")),
+  scmInfo := Some(
+    ScmInfo(url("https://github.com/andreclaudino/SparkSinfony"), "scm:git@github.com:andreclaudino/spark-cloud-persistense.git")
+  )
+)
