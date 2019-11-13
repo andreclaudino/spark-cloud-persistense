@@ -1,6 +1,6 @@
 name := "spark-cloud-persistense"
 organization in ThisBuild := "com.b2wdigital.iafront.persistense"
-scalaVersion in ThisBuild := "2.11.12"
+scalaVersion in ThisBuild := "2.12.9"
 
 publishTo := sonatypePublishTo.value
 publishConfiguration := publishConfiguration.value.withOverwrite(true)
@@ -76,12 +76,12 @@ lazy val base  =
   Project("spark-cloud-persistense-base", file("base-persistense"))
     .settings(
       Seq(libraryDependencies ++= commonDependencies) ++ commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-base"))
-    ).settings(commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-base"))
 
 lazy val commonDependencies =
   Seq(
-    "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
-    "org.apache.spark" %% "spark-core" % sparkVersion % "provided"
+    "org.apache.spark" %% "spark-sql"   % sparkVersion  % "provided",
+    "org.apache.spark" %% "spark-core"  % sparkVersion  % "provided",
+    "org.scalatest"    %% "scalatest"   % "3.0.8"       % "test"
   )
 
 /////////////////////// s3 ///////////////////////////////////////////
@@ -89,15 +89,12 @@ lazy val s3  =
   Project("spark-cloud-persistense-s3", file("s3-persistense"))
     .dependsOn(base)
     .settings(libraryDependencies ++= commonDependencies ++ s3Dependencies)
-      libraryDependencies ++= commonDependencies ++ s3Dependencies
-    )
     .settings(artifact in (Compile, assembly) := {
       val art = (artifact in (Compile, assembly)).value
       art.withClassifier(Some("assembly"))
     })
   .settings(addArtifact(artifact in (Compile, assembly), assembly))
   .settings(commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-s3"))
-//  .settings(s3ShadeRules)
 
 lazy val s3Dependencies = Seq(
   "com.amazonaws" % "aws-java-sdk" % "1.7.4"
@@ -156,33 +153,42 @@ lazy val gsShadeRules = {
     .inAll
   )
 }
-/////////////////// validation //////////////////////////////////////
-lazy val validationS3  =
-  Project("validation-s3", file("validation-s3"))
-    .dependsOn(s3)
+
+///////////////////// athena ////////////////////////////////////////
+lazy val athena  =
+  Project("spark-cloud-persistense-athena", file("athena-persistense"))
+    .dependsOn(base)
     .settings(
-      libraryDependencies ++= commonDependencies
-    ).settings(commonConfiguration)
+      libraryDependencies ++= commonDependencies ++ athenaDependencies
+    )
     .settings(artifact in (Compile, assembly) := {
       val art = (artifact in (Compile, assembly)).value
       art.withClassifier(Some("assembly"))
+    },
+    {
+      javacOptions ++= Seq("-source", "1.8", "-target:jvm-1.8", "-Xlint")
     })
     .settings(addArtifact(artifact in (Compile, assembly), assembly))
-    .settings(commonConfiguration ++ Seq(publishArtifact := false))
+    .settings(commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-athena"))
 
-lazy val validationGS  =
-  Project("validation-gs", file("validation-gs"))
-    .dependsOn(gs)
-    .settings(
-      libraryDependencies ++= commonDependencies
-    ).settings(commonConfiguration)
-    .settings(artifact in (Compile, assembly) := {
-      val art = (artifact in (Compile, assembly)).value
-      art.withClassifier(Some("assembly"))
-    })
-    .settings(addArtifact(artifact in (Compile, assembly), assembly))
-    .settings(commonConfiguration ++ Seq(publishArtifact := false))
+lazy val athenaDependencies = Seq(
+  "software.amazon.awssdk"  % "athena"  % awsServicesVersion,
+  "software.amazon.awssdk"  % "auth"    % awsServicesVersion
+)
 
+lazy val athenaShadeRules = {
+  assemblyShadeRules in assembly ++= Seq(
+    ShadeRule
+      .rename("*" -> "com.b2wdigital.iafront.persistense.athena.shaded.@1")
+      .inAll,
+    ShadeRule
+      .keep(
+        "org.apache.**",
+        "org.log4j.**",
+        "com.b2wdigital.iafront.persistense.athena.**")
+      .inAll
+  )
+}
 
 /////////////// Configurations //////////////////////
 logLevel in assembly := Level.Debug

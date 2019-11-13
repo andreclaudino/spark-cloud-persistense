@@ -1,21 +1,17 @@
 package com.b2wdigital.iafront.persistense.athena.aws
 
 import com.b2wdigital.iafront.persistense.athena.utils
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.types.{BooleanType, DateType, DoubleType, LongType, StringType, StructField, StructType, TimestampType}
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
 import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.athena.{AthenaClient, AthenaClientBuilder}
-import software.amazon.awssdk.services.athena.model._
-import org.apache.spark.sql.{Row => SparkRow}
-import software.amazon.awssdk.services.athena.model.{Row => AthenaRow}
+import software.amazon.awssdk.services.athena.AthenaClient
+import software.amazon.awssdk.services.athena.model.{GetQueryResultsResponse, _}
+import com.b2wdigital.iafront.persistense.model._
+
+import org.apache.spark.sql.{Row => SparkRowObj}
 
 import scala.collection.JavaConverters._
 
-class QuerySubmitter(databaseNameOption:Option[String],
-                     outputBucket:String,
-                     sleepTImeMs:Long=200,
-                     pageSize:Int=1000) {
+class QuerySubmitter(outputBucket:String, databaseName:String="default", sleepTImeMs:Long=200, pageSize:Int=1000) {
 
   private val athenaClient:AthenaClient = {
     AthenaClient
@@ -23,15 +19,15 @@ class QuerySubmitter(databaseNameOption:Option[String],
       .region(Region.US_EAST_1)
       .credentialsProvider(ProfileCredentialsProvider.create())
       .build
-  };
-  private val queryExecutionContext:QueryExecutionContext = {
-    val databaseName = databaseNameOption.getOrElse("default")
+  }
 
+  private val queryExecutionContext:QueryExecutionContext = {
     QueryExecutionContext
       .builder()
       .database(databaseName)
       .build()
   }
+
   private val resultConfiguration:ResultConfiguration = {
     ResultConfiguration
       .builder()
@@ -60,7 +56,7 @@ class QuerySubmitter(databaseNameOption:Option[String],
         .queryExecutionId(queryExecutionId)
         .build();
 
-    utils.whiley(true) {
+    utils.whiley(cond = true) {
       val getQueryExecutionResponse = athenaClient.getQueryExecution(getQueryExecutionRequest)
       val queryStatus = getQueryExecutionResponse.queryExecution().status()
 
@@ -74,72 +70,93 @@ class QuerySubmitter(databaseNameOption:Option[String],
     }
   }
 
-  private def getQueryData(queryExecutionId:String)(spark:SparkSession) = {
+  private def translateSchema(resultSetMetadata: ResultSetMetadata):Seq[SchemaColumn] = {
+    resultSetMetadata
+      .columnInfo
+      .asScala
+      .map(createColumnSchema)
+  }
+
+  private def createColumnSchema(columnInfo: ColumnInfo):SchemaColumn = {
+    val columnType =
+      columnInfo.`type`() match {
+        case "varchar" => "string"
+        case "tinyint" | "smallint" | "integer" => "int"
+        case "bigint" => "long"
+        case `type`:String => `type`
+      }
+
+    SchemaColumn(columnInfo.name(), columnType)
+  }
+
+  private def getQueryData(queryResultsRequest: GetQueryResultsRequest):Stream[SparkRow] = {
+    getPages(queryResultsRequest)
+      .flatMap(expandPage) // flatten and map
+      .toStream
+      .tail
+  }
+
+  private def expandPage(page:GetQueryResultsResponse):Seq[SparkRow] = {
+    page
+      .resultSet
+      .rows
+      .asScala
+      .toArray
+      .map(row => expandRow(row))
+  }
+
+  private def expandRow(row:AthenaRow):SparkRow = {
+    val rowData =
+      row
+        .data
+        .asScala
+        .map(_.varCharValue)
+
+    SparkRowObj.fromSeq(rowData)
+  }
+
+  private def getSchema(queryResultsRequest: GetQueryResultsRequest):Seq[SchemaColumn] = {
+      translateSchema {
+        athenaClient
+          .getQueryResults(queryResultsRequest)
+          .resultSet()
+          .resultSetMetadata()
+      }
+  }
+
+  private def getPages(queryResultsRequest: GetQueryResultsRequest):Iterator[GetQueryResultsResponse] = {
+    athenaClient
+      .getQueryResultsPaginator(queryResultsRequest)
+      .stream // java stream of result pages
+      .iterator
+      .asScala  // scala seq of result pages
+  }
+
+
+  private def getQueryResults(queryExecutionId: String):GetQueryResultsRequest = {
     val queryResultsRequest =
       GetQueryResultsRequest
         .builder
         .maxResults(pageSize)
         .queryExecutionId(queryExecutionId)
-        .build();
-
-    val metaResult =
-      athenaClient
-        .getQueryResultsPaginator(queryResultsRequest)
-
-    val resultSetMetadata =
-      athenaClient
-      .getQueryResults(queryResultsRequest)
-      .resultSet()
-      .resultSetMetadata()
-
-    val schema = translateSchema(resultSetMetadata)
-
-    val results =
-        metaResult
-        .stream
-        .iterator
-        .asScala
-        .toStream
-        .map(print)
-
+        .build()
+    queryResultsRequest
   }
 
-  def athena2Spark(row:AthenaRow, schema:StructType):SparkRow = {
-    ???
-//    schema.fields.map({
-//      column =>
-//        row.data.get()
-//    })
-  }
-
-  private def translateSchema(resultSetMetadata: ResultSetMetadata) = {
-    val columnInfoList =
-      resultSetMetadata
-        .columnInfo
-        .asScala
-
-    val fields = columnInfoList.map(createColumnSchema).toArray
-    new StructType(fields)
-  }
-
-  private def createColumnSchema(columnInfo: ColumnInfo):StructField = {
-    /// Transform in recursive to deal structs
-    val columnType =
-      columnInfo.`type`() match {
-        case "varchar" => StringType
-        case "tinyint" | "smallint" | "integer" | "bigint" => LongType
-        case "double" | "float" => DoubleType
-        case "boolean" => BooleanType
-        case "date" => DateType
-        case "timestamp" => TimestampType
-        case _ => StringType
-      }
-
-    StructField(columnInfo.name(), columnType)
-  }
-
-  def execute(query:String) = {
+  def executeQuery(query:String):QueryResult = {
     val queryId = startQueryExecution(query)
-    reportStatus(queryId)
+    val status = reportStatus(queryId)
+
+    val queryResultsRequest = getQueryResults(queryId)
+    val schema = getSchema(queryResultsRequest)
+
+    val columnNames = schema.toSeq.map(_.name)
+    val columnTypes = schema.toSeq.map(_.dataType)
+
+    val data = getQueryData(queryResultsRequest)
+
+
+    QueryResult(status, schema, data)
   }
+
 }

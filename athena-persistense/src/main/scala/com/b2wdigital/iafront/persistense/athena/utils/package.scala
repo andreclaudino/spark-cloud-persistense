@@ -6,4 +6,5 @@ package object utils {
     def loop(previous : T) : T = if(cond) loop(body) else previous
     if(cond) loop(body) else throw new Exception("Loop must be entered at least once.")
   }
+
 }
