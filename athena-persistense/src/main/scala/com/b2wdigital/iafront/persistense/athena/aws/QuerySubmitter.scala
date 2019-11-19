@@ -1,17 +1,21 @@
 package com.b2wdigital.iafront.persistense.athena.aws
 
 import com.b2wdigital.iafront.persistense.athena.utils
+import com.b2wdigital.iafront.persistense.model._
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.athena.AthenaClient
-import software.amazon.awssdk.services.athena.model.{GetQueryResultsResponse, _}
-import com.b2wdigital.iafront.persistense.model._
-
-import org.apache.spark.sql.{Row => SparkRowObj}
+import software.amazon.awssdk.services.athena.model._
 
 import scala.collection.JavaConverters._
 
-class QuerySubmitter(outputBucket:String, databaseName:String="default", sleepTImeMs:Long=200, pageSize:Int=1000) {
+class QuerySubmitter(outputBucket:String, databaseNameOption:Option[String]=None,
+                     sleepTImeMsOption:Option[Long]=None,
+                     pageSizeOption:Option[Int]=None) {
+
+  private val databaseName = databaseNameOption.getOrElse("default")
+  private val sleepTImeMs = sleepTImeMsOption.getOrElse(200L)
+  private val pageSize = pageSizeOption.getOrElse(1000)
 
   private val athenaClient:AthenaClient = {
     AthenaClient
@@ -49,18 +53,21 @@ class QuerySubmitter(outputBucket:String, databaseName:String="default", sleepTI
       .queryExecutionId()
   }
 
-  private def reportStatus(queryExecutionId:String):Option[QueryExecutionStatus] = {
+  def getQueryExecutionResponse(queryExecutionId:String) = {
     val getQueryExecutionRequest =
       GetQueryExecutionRequest
         .builder()
         .queryExecutionId(queryExecutionId)
-        .build();
+        .build()
 
+    athenaClient.getQueryExecution(getQueryExecutionRequest)
+  }
+
+  private def reportStatus(queryExecutionId:String):Option[QueryExecutionStatus] = {
     utils.whiley(cond = true) {
-      val getQueryExecutionResponse = athenaClient.getQueryExecution(getQueryExecutionRequest)
-      val queryStatus = getQueryExecutionResponse.queryExecution().status()
-
-      queryStatus.state match {
+      val queryExecutionResponse = getQueryExecutionResponse(queryExecutionId)
+      val queryStatus = queryExecutionResponse.queryExecution().status()
+            queryStatus.state match {
         case QueryExecutionState.QUEUED | QueryExecutionState.RUNNING =>
           Thread.sleep(sleepTImeMs)
           None
@@ -89,32 +96,6 @@ class QuerySubmitter(outputBucket:String, databaseName:String="default", sleepTI
     SchemaColumn(columnInfo.name(), columnType)
   }
 
-  private def getQueryData(queryResultsRequest: GetQueryResultsRequest):Stream[SparkRow] = {
-    getPages(queryResultsRequest)
-      .flatMap(expandPage) // flatten and map
-      .toStream
-      .tail
-  }
-
-  private def expandPage(page:GetQueryResultsResponse):Seq[SparkRow] = {
-    page
-      .resultSet
-      .rows
-      .asScala
-      .toArray
-      .map(row => expandRow(row))
-  }
-
-  private def expandRow(row:AthenaRow):SparkRow = {
-    val rowData =
-      row
-        .data
-        .asScala
-        .map(_.varCharValue)
-
-    SparkRowObj.fromSeq(rowData)
-  }
-
   private def getSchema(queryResultsRequest: GetQueryResultsRequest):Seq[SchemaColumn] = {
       translateSchema {
         athenaClient
@@ -123,15 +104,6 @@ class QuerySubmitter(outputBucket:String, databaseName:String="default", sleepTI
           .resultSetMetadata()
       }
   }
-
-  private def getPages(queryResultsRequest: GetQueryResultsRequest):Iterator[GetQueryResultsResponse] = {
-    athenaClient
-      .getQueryResultsPaginator(queryResultsRequest)
-      .stream // java stream of result pages
-      .iterator
-      .asScala  // scala seq of result pages
-  }
-
 
   private def getQueryResults(queryExecutionId: String):GetQueryResultsRequest = {
     val queryResultsRequest =
@@ -150,13 +122,14 @@ class QuerySubmitter(outputBucket:String, databaseName:String="default", sleepTI
     val queryResultsRequest = getQueryResults(queryId)
     val schema = getSchema(queryResultsRequest)
 
-    val columnNames = schema.toSeq.map(_.name)
-    val columnTypes = schema.toSeq.map(_.dataType)
+    val outputFile =
+      getQueryExecutionResponse(queryId)
+        .queryExecution
+        .resultConfiguration
+        .outputLocation
+        .replaceFirst("s3://", "s3a://")
 
-    val data = getQueryData(queryResultsRequest)
-
-
-    QueryResult(status, schema, data)
+    QueryResult(status, schema, outputFile)
   }
 
 }

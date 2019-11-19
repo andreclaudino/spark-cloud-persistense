@@ -11,7 +11,6 @@ object AthenaImplicitConversions {
     def asLong:Long = value.toDouble.toLong
 
     private val dateFormatter = new SimpleDateFormat("yyyy-MM-dd") //2019-07-29
-    private val dateTimeFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS") //2019-07-29 08:18:26.074
     def asDate:Date = new Date(dateFormatter.parse(value).getTime)
     def asDate(format:String):Date = {
       val customFormatter = new SimpleDateFormat(format) //2019-07-29 08:18:26.074

@@ -7,6 +7,8 @@ package object model {
   type SparkRow = org.apache.spark.sql.Row
 
   case class SchemaColumn(name:String, dataType:String)
-  case class QueryResult(status:Option[QueryExecutionStatus], schema:Seq[SchemaColumn], resultStream:Stream[SparkRow])
+  case class QueryResult(status:Option[QueryExecutionStatus],
+                         schema:Seq[SchemaColumn],
+                         outputLocation:String)
 
 }

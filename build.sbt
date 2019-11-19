@@ -97,10 +97,8 @@ lazy val s3  =
   .settings(commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-s3"))
 
 lazy val s3Dependencies = Seq(
-  "com.amazonaws" % "aws-java-sdk" % "1.7.4"
-    exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "org.apache.hadoop" % "hadoop-aws" % "2.7.3"
-    exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "software.amazon.awssdk" % "s3" % "2.10.18" exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.apache.hadoop" % "hadoop-aws" % "2.7.3" exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.6.7"
 )
 
@@ -158,6 +156,7 @@ lazy val gsShadeRules = {
 lazy val athena  =
   Project("spark-cloud-persistense-athena", file("athena-persistense"))
     .dependsOn(base)
+    .dependsOn(s3)
     .settings(
       libraryDependencies ++= commonDependencies ++ athenaDependencies
     )
@@ -173,7 +172,7 @@ lazy val athena  =
 
 lazy val athenaDependencies = Seq(
   "software.amazon.awssdk"  % "athena"  % awsServicesVersion,
-  "software.amazon.awssdk"  % "auth"    % awsServicesVersion
+
 )
 
 lazy val athenaShadeRules = {
@@ -212,3 +211,4 @@ def publishingConfiguration(name:String):sbt.Def.SettingsDefinition = Seq(
     ScmInfo(url("https://github.com/andreclaudino/SparkSinfony"), "scm:git@github.com:andreclaudino/spark-cloud-persistense.git")
   )
 )
+
