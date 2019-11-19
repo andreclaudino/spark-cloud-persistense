@@ -16,7 +16,7 @@ scmInfo := Some(
   ScmInfo(url("https://github.com/andreclaudino/SparkSinfony"), "scm:git@github.com:andreclaudino/spark-cloud-persistense.git")
 )
 
-val commonVersion = "1.0.3"
+val commonVersion = "1.0.3-SNAPSHOT"
 
 version := commonVersion
 
