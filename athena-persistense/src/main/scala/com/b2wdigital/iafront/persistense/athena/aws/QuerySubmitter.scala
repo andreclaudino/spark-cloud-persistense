@@ -90,7 +90,7 @@ class QuerySubmitter(outputBucket:String, databaseNameOption:Option[String]=None
         case "varchar" => "string"
         case "tinyint" | "smallint" | "integer" => "int"
         case "bigint" => "long"
-        case `type`:String => `type`
+        case dataType:String => dataType
       }
 
     SchemaColumn(columnInfo.name(), columnType)

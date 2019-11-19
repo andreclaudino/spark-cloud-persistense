@@ -2,26 +2,12 @@ name := "spark-cloud-persistense"
 organization in ThisBuild := "com.b2wdigital.iafront.persistense"
 scalaVersion in ThisBuild := "2.12.9"
 
-publishTo := sonatypePublishTo.value
-publishConfiguration := publishConfiguration.value.withOverwrite(true)
-publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(true)
-publishMavenStyle := true
-licenses := Seq("APL2" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
-sonatypeProfileName := "com.b2wdigital"
-
-import xerial.sbt.Sonatype._
-sonatypeProjectHosting := Some(GitHubHosting("andreclaudino", "spark-cloud-persistense", ""))
-homepage := Some(url(s"https://github.com/andreclaudino/spark-cloud-persistense"))
-scmInfo := Some(
-  ScmInfo(url("https://github.com/andreclaudino/SparkSinfony"), "scm:git@github.com:andreclaudino/spark-cloud-persistense.git")
-)
+publish / skip := true
 
 val commonVersion = "1.0.3-SNAPSHOT"
-
 version := commonVersion
 
 val awsServicesVersion = "2.10.7"
-
 val sparkVersion = "2.4.4"
 
 lazy val root =
@@ -47,6 +33,8 @@ lazy val commonConfiguration = Seq(
       case PathList("javax", "inject", xs @ _*) => MergeStrategy.first
       case PathList("org", "aopalliance", xs @ _*) => MergeStrategy.first
       case PathList("org", "fusesource", xs @ _*) => MergeStrategy.first
+      case PathList("codegen-resources", xs @ _*) => MergeStrategy.first
+      case "META-INF/io.netty.versions.properties" => MergeStrategy.first
       case "about.html" => MergeStrategy.rename
       case "META-INF/ECLIPSEF.RSA" => MergeStrategy.last
       case "META-INF/mailcap" => MergeStrategy.last
@@ -54,6 +42,7 @@ lazy val commonConfiguration = Seq(
       case "plugin.properties" => MergeStrategy.last
       case "log4j.properties" => MergeStrategy.last
       case "mozilla/public-suffix-list.txt" => MergeStrategy.last
+      case "mime.types" => MergeStrategy.last
       case x =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
@@ -68,6 +57,9 @@ lazy val commonConfiguration = Seq(
   },
   {
     version := commonVersion
+  },
+  {
+    crossScalaVersions in ThisBuild := Seq("2.11.8", "2.12.2")
   }
 )
 
@@ -102,20 +94,6 @@ lazy val s3Dependencies = Seq(
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.6.7"
 )
 
-lazy val s3ShadeRules = {
-  assemblyShadeRules in assembly ++= Seq(
-  ShadeRule
-    .rename("*" -> "com.b2wdigital.iafront.persistense.s3.shaded.@1")
-    .inAll,
-  ShadeRule
-    .keep(
-      "org.apache.**",
-      "org.apache.hadoop.fs.s3a.S3AFileSystem",
-      "org.log4j.**",
-      "com.b2wdigital.iafront.persistense.s3.**")
-    .inAll
-  )
-}
 ////////////////////// gs //////////////////////////////////////////
 lazy val gs  =
   Project("spark-cloud-persistense-gs", file("gs-persistense"))
@@ -137,21 +115,6 @@ lazy val gsDependencies = Seq(
       exclude("com.fasterxml.jackson.core", " jackson-annotations")
 )
 
-lazy val gsShadeRules = {
-  assemblyShadeRules in assembly ++= Seq(
-  ShadeRule
-    .rename("*" -> "com.b2wdigital.iafront.persistense.gs.shaded.@1")
-    .inAll,
-  ShadeRule
-    .keep(
-      "org.apache.**",
-      "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS",
-      "org.log4j.**",
-      "com.b2wdigital.iafront.persistense.gs.**")
-    .inAll
-  )
-}
-
 ///////////////////// athena ////////////////////////////////////////
 lazy val athena  =
   Project("spark-cloud-persistense-athena", file("athena-persistense"))
@@ -171,30 +134,13 @@ lazy val athena  =
     .settings(commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-athena"))
 
 lazy val athenaDependencies = Seq(
-  "software.amazon.awssdk"  % "athena"  % awsServicesVersion,
-
+  "software.amazon.awssdk"  % "athena"  % awsServicesVersion
 )
-
-lazy val athenaShadeRules = {
-  assemblyShadeRules in assembly ++= Seq(
-    ShadeRule
-      .rename("*" -> "com.b2wdigital.iafront.persistense.athena.shaded.@1")
-      .inAll,
-    ShadeRule
-      .keep(
-        "org.apache.**",
-        "org.log4j.**",
-        "com.b2wdigital.iafront.persistense.athena.**")
-      .inAll
-  )
-}
 
 /////////////// Configurations //////////////////////
 logLevel in assembly := Level.Debug
 
-
 /////////////// Publishing ///////////////
-
 def publishingConfiguration(name:String):sbt.Def.SettingsDefinition = Seq(
   publishTo := sonatypePublishToBundle.value,
   publishConfiguration := publishConfiguration.value.withOverwrite(true),
@@ -208,7 +154,7 @@ def publishingConfiguration(name:String):sbt.Def.SettingsDefinition = Seq(
   },
   homepage := Some(url(s"https://github.com/andreclaudino/spark-cloud-persistense")),
   scmInfo := Some(
-    ScmInfo(url("https://github.com/andreclaudino/SparkSinfony"), "scm:git@github.com:andreclaudino/spark-cloud-persistense.git")
+    ScmInfo(url("https://github.com/andreclaudino/spark-cloud-persistense"), "scm:git@github.com:andreclaudino/spark-cloud-persistense.git")
   )
 )
 
