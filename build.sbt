@@ -15,6 +15,7 @@ lazy val root =
       .aggregate(base)
       .aggregate(s3)
       .aggregate(gs)
+      .aggregate(athena)
 
 /// Subprojects
 lazy val commonConfiguration = Seq(
