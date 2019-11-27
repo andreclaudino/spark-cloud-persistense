@@ -2,7 +2,7 @@ package com.b2wdigital.iafront.persistense.athena.aws
 
 import com.b2wdigital.iafront.persistense.athena.utils
 import com.b2wdigital.iafront.persistense.model._
-import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
+import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.athena.AthenaClient
 import software.amazon.awssdk.services.athena.model._
@@ -21,7 +21,7 @@ class QuerySubmitter(outputBucket:String, databaseNameOption:Option[String]=None
     AthenaClient
       .builder
       .region(Region.US_EAST_1)
-      .credentialsProvider(ProfileCredentialsProvider.create())
+      .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
       .build
   }
 
