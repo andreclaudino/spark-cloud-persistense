@@ -4,7 +4,7 @@ scalaVersion in ThisBuild := "2.12.9"
 
 publish / skip := true
 
-val commonVersion = "1.0.3-SNAPSHOT"
+val commonVersion = "1.0.5-SNAPSHOT"
 version := commonVersion
 
 val awsServicesVersion = "2.10.7"
@@ -35,6 +35,7 @@ lazy val commonConfiguration = Seq(
       case PathList("org", "aopalliance", xs @ _*) => MergeStrategy.first
       case PathList("org", "fusesource", xs @ _*) => MergeStrategy.first
       case PathList("codegen-resources", xs @ _*) => MergeStrategy.first
+      case PathList("org","objectweb", xs @ _*) => MergeStrategy.first
       case "META-INF/io.netty.versions.properties" => MergeStrategy.first
       case "about.html" => MergeStrategy.rename
       case "META-INF/ECLIPSEF.RSA" => MergeStrategy.last
@@ -90,7 +91,7 @@ lazy val s3  =
   .settings(commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-s3"))
 
 lazy val s3Dependencies = Seq(
-  "software.amazon.awssdk" % "s3" % "2.10.18" exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "com.amazonaws" % "aws-java-sdk" % "1.7.4" exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.apache.hadoop" % "hadoop-aws" % "2.7.3" exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.6.7"
 )
