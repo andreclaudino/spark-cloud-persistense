@@ -1,3 +1,5 @@
+import sbtassembly.AssemblyPlugin.autoImport.ShadeRule
+
 name := "spark-cloud-persistense"
 organization in ThisBuild := "com.b2wdigital.iafront.persistense"
 scalaVersion in ThisBuild := "2.12.9"
@@ -38,6 +40,7 @@ lazy val commonConfiguration = Seq(
       case PathList("org","objectweb", xs @ _*) => MergeStrategy.first
       case "META-INF/io.netty.versions.properties" => MergeStrategy.first
       case "about.html" => MergeStrategy.rename
+      case "module-info.class" => MergeStrategy.first
       case "META-INF/ECLIPSEF.RSA" => MergeStrategy.last
       case "META-INF/mailcap" => MergeStrategy.last
       case "META-INF/mimetypes.default" => MergeStrategy.last
@@ -69,7 +72,8 @@ lazy val commonConfiguration = Seq(
 lazy val base  =
   Project("spark-cloud-persistense-base", file("base-persistense"))
     .settings(
-      Seq(libraryDependencies ++= commonDependencies) ++ commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-base"))
+      Seq(libraryDependencies ++= commonDependencies) ++ commonConfiguration
+        ++ publishingConfiguration("spark-cloud-persistense-base"))
 
 lazy val commonDependencies =
   Seq(
@@ -133,13 +137,20 @@ lazy val athena  =
       javacOptions ++= Seq("-source", "1.8", "-target:jvm-1.8", "-Xlint")
     })
     .settings(addArtifact(artifact in (Compile, assembly), assembly))
-    .settings(commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-athena"))
+    .settings(commonConfiguration ++ athenaShadingRules ++ publishingConfiguration("spark-cloud-persistense-athena"))
 
 lazy val athenaDependencies = Seq(
-  "software.amazon.awssdk"  % "athena"  % awsServicesVersion
+  "software.amazon.awssdk"  % "athena"  % awsServicesVersion exclude("com.fasterxml.jackson.core", "jackson-databind")
 )
 
-/////////////// Configurations //////////////////////
+lazy val athenaShadingRules = Seq({
+  assemblyShadeRules in assembly := Seq(
+    ShadeRule.rename("com.amazonaws.**" -> "com.b2wdigital.iafront.persistense.athena.shade.@1").inAll,
+    ShadeRule.rename("com.b2wdigital.iafront.persistense.s3.**" -> "shade.@1").inAll,
+    ShadeRule.rename("spark.hadoop.fs.s3a.**" -> "shade.@1").inAll
+  )
+})
+/////////////////////// Configurations //////////////////////////////
 logLevel in assembly := Level.Debug
 
 /////////////// Publishing ///////////////
