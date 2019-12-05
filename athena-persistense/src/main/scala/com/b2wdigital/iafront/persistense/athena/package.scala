@@ -8,14 +8,13 @@ package object athena {
 
   implicit class AthenaConfig(sparkSession: SparkSession) {
 
-    def setupAthena:Unit = {
+    def setupAthena():Unit = {
       sparkSession.setupS3
     }
 
     def readAthena(query:String, outputBubucket:String, databaseNameOption:Option[String]=None,
-                   sleepTImeMsOption:Option[Long]=None,
-                   pageSizeOption:Option[Int]=None):DataFrame = {
-      val submitter = new QuerySubmitter(outputBubucket, databaseNameOption, sleepTImeMsOption, pageSizeOption)
+                   sleepTImeMsOption:Option[Long]=None):DataFrame = {
+      val submitter = new QuerySubmitter(outputBubucket, databaseNameOption, sleepTImeMsOption)
 
       val result = submitter.executeQuery(s"select * from ($query)")
 

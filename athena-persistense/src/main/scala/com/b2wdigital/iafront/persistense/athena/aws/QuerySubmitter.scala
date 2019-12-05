@@ -1,135 +1,84 @@
 package com.b2wdigital.iafront.persistense.athena.aws
 
-import com.b2wdigital.iafront.persistense.athena.utils
+import com.b2wdigital.iafront.persistense.utils._
 import com.b2wdigital.iafront.persistense.model._
-import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider
-import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.athena.AthenaClient
-import software.amazon.awssdk.services.athena.model._
+import com.amazonaws.auth.EnvironmentVariableCredentialsProvider
+import com.amazonaws.regions.Regions
+import com.amazonaws.services.athena.model.{GetQueryExecutionRequest, GetQueryExecutionResult, QueryExecutionContext, QueryExecutionState, QueryExecutionStatus, StartQueryExecutionRequest}
+import com.amazonaws.services.athena.{AmazonAthena, AmazonAthenaClientBuilder}
+import com.b2wdigital.iafront.persistense.athena.exceptions._
 
-import scala.collection.JavaConverters._
-
-class QuerySubmitter(outputBucket:String, databaseNameOption:Option[String]=None,
-                     sleepTImeMsOption:Option[Long]=None,
-                     pageSizeOption:Option[Int]=None) {
+private [persistense] class QuerySubmitter(outputBucket:String, databaseNameOption:Option[String]=None,
+                     sleepTImeMsOption:Option[Long]=None) {
 
   private val databaseName = databaseNameOption.getOrElse("default")
   private val sleepTImeMs = sleepTImeMsOption.getOrElse(200L)
-  private val pageSize = pageSizeOption.getOrElse(1000)
 
-  private val athenaClient:AthenaClient = {
-    AthenaClient
-      .builder
-      .region(Region.US_EAST_1)
-      .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
-      .build
+  private val athenaClient:AmazonAthena = {
+    AmazonAthenaClientBuilder
+      .standard
+      .withRegion(Regions.US_EAST_1)
+      .withCredentials(new EnvironmentVariableCredentialsProvider)
+      .build()
   }
 
   private val queryExecutionContext:QueryExecutionContext = {
-    QueryExecutionContext
-      .builder()
-      .database(databaseName)
-      .build()
-  }
-
-  private val resultConfiguration:ResultConfiguration = {
-    ResultConfiguration
-      .builder()
-      .outputLocation(outputBucket)
-      .build()
+    new QueryExecutionContext()
+      .withDatabase(databaseName)
   }
 
   private def startQueryExecution(query:String):String = {
     val startQueryExecutionRequest =
-      StartQueryExecutionRequest
-        .builder
-        .queryString(query)
-        .queryExecutionContext(queryExecutionContext)
-        .resultConfiguration(resultConfiguration)
-        .build()
+      new StartQueryExecutionRequest()
+        .withQueryString(query)
+        .withQueryExecutionContext(queryExecutionContext)
 
     athenaClient
       .startQueryExecution(startQueryExecutionRequest)
-      .queryExecutionId()
+      .getQueryExecutionId
   }
 
-  def getQueryExecutionResponse(queryExecutionId:String) = {
+  def getQueryExecutionResponse(queryExecutionId:String):GetQueryExecutionResult = {
     val getQueryExecutionRequest =
-      GetQueryExecutionRequest
-        .builder()
-        .queryExecutionId(queryExecutionId)
-        .build()
+      new GetQueryExecutionRequest()
+        .withQueryExecutionId(queryExecutionId)
 
     athenaClient.getQueryExecution(getQueryExecutionRequest)
   }
 
   private def reportStatus(queryExecutionId:String):Option[QueryExecutionStatus] = {
-    utils.whiley(cond = true) {
+    whiley(true) {
       val queryExecutionResponse = getQueryExecutionResponse(queryExecutionId)
-      val queryStatus = queryExecutionResponse.queryExecution().status()
-            queryStatus.state match {
+      val queryStatus = queryExecutionResponse.getQueryExecution.getStatus
+
+      QueryExecutionState.fromValue(queryStatus.getState) match {
         case QueryExecutionState.QUEUED | QueryExecutionState.RUNNING =>
           Thread.sleep(sleepTImeMs)
           None
-        case _ =>
+        case QueryExecutionState.FAILED =>
+          throw new QueryFailedException(queryStatus.getStateChangeReason, queryExecutionId)
+        case QueryExecutionState.CANCELLED =>
+          throw new QueryCanceledException(queryStatus.getStateChangeReason, queryExecutionId)
+        case QueryExecutionState.SUCCEEDED =>
           return Some(queryStatus)
       }
     }
   }
 
-  private def translateSchema(resultSetMetadata: ResultSetMetadata):Seq[SchemaColumn] = {
-    resultSetMetadata
-      .columnInfo
-      .asScala
-      .map(createColumnSchema)
-  }
-
-  private def createColumnSchema(columnInfo: ColumnInfo):SchemaColumn = {
-    val columnType =
-      columnInfo.`type`() match {
-        case "varchar" => "string"
-        case "tinyint" | "smallint" | "integer" => "int"
-        case "bigint" => "long"
-        case dataType:String => dataType
-      }
-
-    SchemaColumn(columnInfo.name(), columnType)
-  }
-
-  private def getSchema(queryResultsRequest: GetQueryResultsRequest):Seq[SchemaColumn] = {
-      translateSchema {
-        athenaClient
-          .getQueryResults(queryResultsRequest)
-          .resultSet()
-          .resultSetMetadata()
-      }
-  }
-
-  private def getQueryResults(queryExecutionId: String):GetQueryResultsRequest = {
-    val queryResultsRequest =
-      GetQueryResultsRequest
-        .builder
-        .maxResults(pageSize)
-        .queryExecutionId(queryExecutionId)
-        .build()
-    queryResultsRequest
-  }
 
   def executeQuery(query:String):QueryResult = {
     val queryId = startQueryExecution(query)
-    val status = reportStatus(queryId)
+    val status = reportStatus(queryId).get
 
-    val queryResultsRequest = getQueryResults(queryId)
-    val schema = getSchema(queryResultsRequest)
-
-    val outputFile =
+    val outputLocation =
       getQueryExecutionResponse(queryId)
-        .queryExecution
-        .resultConfiguration
-        .outputLocation
+        .getQueryExecution
+        .getResultConfiguration
+        .getOutputLocation
         .replaceFirst("s3://", "s3a://")
 
-    QueryResult(status, schema, outputFile)
+    val state = State(status.getState, status.getStateChangeReason)
+    QueryResult(state, outputLocation)
   }
 
 }

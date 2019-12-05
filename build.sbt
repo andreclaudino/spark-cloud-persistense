@@ -2,15 +2,16 @@ import sbtassembly.AssemblyPlugin.autoImport.ShadeRule
 
 name := "spark-cloud-persistense"
 organization in ThisBuild := "com.b2wdigital.iafront.persistense"
-scalaVersion in ThisBuild := "2.12.9"
+scalaVersion in ThisBuild := "2.11.12"
 
 publish / skip := true
 
-val commonVersion = "1.0.5-SNAPSHOT"
+val commonVersion = "1.0.6-SNAPSHOT"
 version := commonVersion
 
-val awsServicesVersion = "2.10.7"
+val awsSdkVersion = "1.11.687"
 val sparkVersion = "2.4.4"
+val jacksonVersion = "2.6.7.1"
 
 lazy val root =
   (project in file("."))
@@ -64,7 +65,7 @@ lazy val commonConfiguration = Seq(
     version := commonVersion
   },
   {
-    crossScalaVersions in ThisBuild := Seq("2.11.8", "2.12.2")
+    crossScalaVersions in ThisBuild := Seq("2.11.12", "2.12.2")
   }
 )
 
@@ -78,8 +79,7 @@ lazy val base  =
 lazy val commonDependencies =
   Seq(
     "org.apache.spark" %% "spark-sql"   % sparkVersion  % "provided",
-    "org.apache.spark" %% "spark-core"  % sparkVersion  % "provided",
-    "org.scalatest"    %% "scalatest"   % "3.0.8"       % "test"
+    "org.apache.spark" %% "spark-core"  % sparkVersion  % "provided"
   )
 
 /////////////////////// s3 ///////////////////////////////////////////
@@ -95,9 +95,10 @@ lazy val s3  =
   .settings(commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-s3"))
 
 lazy val s3Dependencies = Seq(
-  "com.amazonaws" % "aws-java-sdk" % "1.7.4" exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "org.apache.hadoop" % "hadoop-aws" % "2.7.3" exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.6.7"
+  "com.amazonaws" % "aws-java-sdk-athena" % awsSdkVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "com.b2wdigital.iafront" %% "hadoop-aws" % "2.8.3-b2w"
+    exclude("com.fasterxml.jackson.core", "jackson-databind")
+//  "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion
 )
 
 ////////////////////// gs //////////////////////////////////////////
@@ -137,19 +138,18 @@ lazy val athena  =
       javacOptions ++= Seq("-source", "1.8", "-target:jvm-1.8", "-Xlint")
     })
     .settings(addArtifact(artifact in (Compile, assembly), assembly))
-    .settings(commonConfiguration ++ athenaShadingRules ++ publishingConfiguration("spark-cloud-persistense-athena"))
+    .settings(commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-athena"))
+
 
 lazy val athenaDependencies = Seq(
-  "software.amazon.awssdk"  % "athena"  % awsServicesVersion exclude("com.fasterxml.jackson.core", "jackson-databind")
+  "com.amazonaws" % "aws-java-sdk-athena" % awsSdkVersion
+    exclude("com.fasterxml.jackson.core", "jackson-databind")
+//    exclude("joda-time", "joda-time")
+//    exclude("org.apache.httpcomponents", "httpclient")
+//    exclude("commons-codec", "commons-codec")
+//    exclude("commons-logging", "commons-logging")
+//  "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion
 )
-
-lazy val athenaShadingRules = Seq({
-  assemblyShadeRules in assembly := Seq(
-    ShadeRule.rename("com.amazonaws.**" -> "com.b2wdigital.iafront.persistense.athena.shade.@1").inAll,
-    ShadeRule.rename("com.b2wdigital.iafront.persistense.s3.**" -> "shade.@1").inAll,
-    ShadeRule.rename("spark.hadoop.fs.s3a.**" -> "shade.@1").inAll
-  )
-})
 /////////////////////// Configurations //////////////////////////////
 logLevel in assembly := Level.Debug
 
@@ -170,4 +170,3 @@ def publishingConfiguration(name:String):sbt.Def.SettingsDefinition = Seq(
     ScmInfo(url("https://github.com/andreclaudino/spark-cloud-persistense"), "scm:git@github.com:andreclaudino/spark-cloud-persistense.git")
   )
 )
-
