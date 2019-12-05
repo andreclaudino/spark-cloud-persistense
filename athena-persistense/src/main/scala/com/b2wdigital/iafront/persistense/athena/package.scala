@@ -1,27 +1,36 @@
 package com.b2wdigital.iafront.persistense
 
-import com.b2wdigital.iafront.persistense.athena.aws.QuerySubmitter
-import org.apache.spark.sql.{DataFrame, SparkSession}
-import com.b2wdigital.iafront.persistense.s3._
+import org.apache.spark.sql.{DataFrame, DataFrameReader}
 
 package object athena {
 
-  implicit class AthenaConfig(sparkSession: SparkSession) {
+  implicit class AthenaDataFrameReader(reader: DataFrameReader) {
 
-    def setupAthena():Unit = {
-      sparkSession.setupS3
+    /**
+     * @param queryOrTableName A query or table name to be loaded
+     * @param options A Map[Stirng, String] with options. Possible options are
+     *                * `region`: the aws region name
+     *                * `s3_staging_dir`: s3 output directory for query results
+     * @return Dataframe with table or query results
+     */
+    def athena(queryOrTableName: String, options:Map[String,String]): DataFrame = {
+      reader
+        .format("com.b2wdigital.iafront.persistense.athena")
+        .options(options)
+        .option(JDBCOptions.JDBC_TABLE_NAME, s"($queryOrTableName)")
+        .load
     }
 
-    def readAthena(query:String, outputBubucket:String, databaseNameOption:Option[String]=None,
-                   sleepTImeMsOption:Option[Long]=None):DataFrame = {
-      val submitter = new QuerySubmitter(outputBubucket, databaseNameOption, sleepTImeMsOption)
-
-      val result = submitter.executeQuery(s"select * from ($query)")
-
-      sparkSession
-        .read
-        .option("header", "true")
-        .csv(result.outputLocation)
+    /**
+     * @param queryOrTableName A query or table name to be loaded
+     * @param s3StagingDir s3 output directory for query results
+     * @param region Athena region to use. Defaults to us-east-1
+     * @return Dataframe with table or query results
+     */
+    def athena(queryOrTableName:String, s3StagingDir:String, region:String="us-east-1"): DataFrame = {
+      val options = Map("region" -> region, "s3_staging_dir" -> s3StagingDir)
+      reader.athena(queryOrTableName, options)
     }
+
   }
 }

@@ -95,10 +95,9 @@ lazy val s3  =
   .settings(commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-s3"))
 
 lazy val s3Dependencies = Seq(
-  "com.amazonaws" % "aws-java-sdk-athena" % awsSdkVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "com.b2wdigital.iafront" %% "hadoop-aws" % "2.8.3-b2w"
-    exclude("com.fasterxml.jackson.core", "jackson-databind")
-//  "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion
+  "com.amazonaws" % "aws-java-sdk" % "1.7.4" exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.apache.hadoop" % "hadoop-aws" % "2.7.3" exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion
 )
 
 ////////////////////// gs //////////////////////////////////////////
@@ -126,7 +125,6 @@ lazy val gsDependencies = Seq(
 lazy val athena  =
   Project("spark-cloud-persistense-athena", file("athena-persistense"))
     .dependsOn(base)
-    .dependsOn(s3)
     .settings(
       libraryDependencies ++= commonDependencies ++ athenaDependencies
     )
@@ -140,15 +138,9 @@ lazy val athena  =
     .settings(addArtifact(artifact in (Compile, assembly), assembly))
     .settings(commonConfiguration ++ publishingConfiguration("spark-cloud-persistense-athena"))
 
-
 lazy val athenaDependencies = Seq(
-  "com.amazonaws" % "aws-java-sdk-athena" % awsSdkVersion
-    exclude("com.fasterxml.jackson.core", "jackson-databind")
-//    exclude("joda-time", "joda-time")
-//    exclude("org.apache.httpcomponents", "httpclient")
-//    exclude("commons-codec", "commons-codec")
-//    exclude("commons-logging", "commons-logging")
-//  "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion
+  "org.apache.spark" %% "spark-hive" % sparkVersion % "provided",
+  "com.syncron.amazonaws" % "simba-athena-jdbc-driver" % "2.0.2"
 )
 /////////////////////// Configurations //////////////////////////////
 logLevel in assembly := Level.Debug
