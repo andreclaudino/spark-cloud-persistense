@@ -1,0 +1,25 @@
+language: scala
+
+jdk: openjdk8
+
+scala:
+  - 2.11.12
+  - 2.12.10
+
+script:
+  - sbt + publishSigned
+  - sbt sonatypeBundleRelease
+
+cache:
+  directories:
+    - $HOME/.cache/coursier
+    - $HOME/.ivy2/cache
+    - $HOME/.sbt
+
+notifications:
+  email:
+    recipients:
+      - andre.claudino@b2wdigital.com
+      - pedro.rangel@b2wdigital.com
+  on_success: always
+  on_failure: aways

@@ -1,4 +1,4 @@
-package com.b2wdigital.iafront.persistense.athena
+package com.b2wdigital.iafront.persistense
 
 package object utils {
   def whiley[T](cond : =>Boolean)(body : =>T) : T = {
