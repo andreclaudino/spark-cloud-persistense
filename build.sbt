@@ -5,9 +5,12 @@ organization in ThisBuild := "com.b2wdigital.iafront.persistense"
 scalaVersion in ThisBuild := "2.11.12"
 
 publish / skip := true
+enablePlugins(GitVersioning)
 
-val commonVersion = "1.0.6-SNAPSHOT"
-version := commonVersion
+git.gitTagToVersionNumber := { tag: String =>
+  if(tag matches "v[0-9]+\\..*") Some(tag)
+  else None
+}
 
 val awsSdkVersion = "1.11.687"
 val sparkVersion = "2.4.4"
@@ -62,12 +65,23 @@ lazy val commonConfiguration = Seq(
     runMain in Compile := Defaults.runMainTask(fullClasspath in Compile, runner in(Compile, run)).evaluated
   },
   {
-    version := commonVersion
+    git.gitTagToVersionNumber := { tag: String =>
+      if(tag matches "v[0-9]+\\..*") Some(tag)
+      else None
+    }
   },
   {
     crossScalaVersions in ThisBuild := Seq("2.11.12", "2.12.2")
   }
-)
+) ++ {
+  val username = sys.env.get("SONATYPE_PASSWORD")
+  val password = sys.env.get("SONATYPE_USERNAME")
+
+  if(username.isDefined && password.isDefined)
+    Seq(credentials += Credentials("Sonatype Nexus Repository Manager", "oss.sonatype.org", username.get, password.get))
+  else
+    Seq()
+}
 
 /////////////////////// base ////////////////////////////////////////
 lazy val base  =
