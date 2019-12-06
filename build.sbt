@@ -5,6 +5,7 @@ organization in ThisBuild := "com.b2wdigital.iafront.persistense"
 scalaVersion in ThisBuild := "2.11.12"
 
 publish / skip := true
+publishingConfiguration("spark-cloud-persistense")
 enablePlugins(GitVersioning)
 
 git.gitTagToVersionNumber := { tag: String =>
