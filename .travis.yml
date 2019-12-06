@@ -7,8 +7,9 @@ scala:
   - 2.12.10
 
 script:
-  - sbt + publishSigned
-  - sbt sonatypeBundleRelease
+  - sbt assembly
+  on:
+    tags: true
 
 cache:
   directories:
